@@ -17,20 +17,54 @@ DNS Tester is a command-line tool written in Go that benchmarks various DNS prov
   - `ping` for latency tests
   - `dig` for DNS resolution tests
 
-## Installation
+## Run
 
-1. **Clone the Repository:**
+### Linux/Mac OS:
 
-   ```bash
-   git clone https://github.com/yourusername/dns-tester.git
-   cd dns-tester
+Be careful when choosing an architecture, all binaries are available in two versions - `amd64` and `arm64`.
 
-2. **Build the Binary:**
+1.
+    ```
+    wget "https://github.com/hawshemi/dns-tester/releases/latest/download/dns-tester-$(uname -s | tr A-Z a-z)-amd64" -O dns-tester && chmod +x dns-tester
+    ```
+2. 
+    ```
+    ./dns-tester
+    ```
 
-    ```bash
-    go build -o dns-tester
+### Windows:
 
-## Usage
+1. Download from [Releases](https://github.com/hawshemi/dns-tester/releases/latest).
+2. Open `CMD` or `Powershell` in the directory.
+3.
+    ```
+    .\dns-tester.exe
+    ```
 
-   ```bash
-   ./dns-tester
+## Build
+
+### Prerequisites
+
+#### Install `wget`:
+```
+sudo apt install -y wget
+```
+
+#### 1. Clone the repository
+```
+git clone https://github.com/hawshemi/dns-tester.git 
+```
+
+#### 2. Navigate into the repository directory
+```
+cd dns-tester
+```
+
+#### 3.
+```
+go mod init dns-tester && go mod tidy
+```
+#### 4. Build
+```
+CGO_ENABLED=0 go build
+```
