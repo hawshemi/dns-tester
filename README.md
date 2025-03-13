@@ -41,6 +41,25 @@ Be careful when choosing an architecture, all binaries are available in two vers
     .\dns-tester.exe
     ```
 
+    
+## Usage
+
+dns-tester flags:
+
+`--output (-o): Output format (table, json, csv), default: table`
+
+`--runs (-r): Number of test runs, default: 3`
+
+`--help (-h): Show help`
+
+Examples:
+
+```
+./dns-tester
+./dns-tester -o json -r 5
+./dns-tester --output=csv --runs=2
+```
+
 ## Build
 
 ### Prerequisites
