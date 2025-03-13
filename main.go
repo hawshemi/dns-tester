@@ -3,6 +3,9 @@ package main
 import (
 	"bufio"
 	"context"
+	"encoding/csv"
+	"encoding/json"
+	"flag"
 	"fmt"
 	"math"
 	"os"
@@ -32,20 +35,17 @@ type TestResult struct {
 	PingMedian        string
 	PingJitter        string
 	PingLoss          string
-
 	AvgResolveTime    string
 	MinResolveTime    string
 	MaxResolveTime    string
 	ResolveMedian     string
 	ResolveJitter     string
 	ResolveLoss       string
-
 	// Numeric values used for composite scoring.
 	PingAvgVal        float64
 	PingMedianVal     float64
 	PingJitterVal     float64
 	PingLossVal       float64
-
 	ResolveAvgVal     float64
 	ResolveMedianVal  float64
 	ResolveJitterVal  float64
@@ -64,11 +64,10 @@ const (
 
 // Weights for composite score (you can adjust these).
 const (
-	weightPingAvg      = 0.25
-	weightPingMedian   = 0.25
-	weightPingJitter   = 0.25
-	weightPingLoss     = 0.25
-
+	weightPingAvg        = 0.25
+	weightPingMedian     = 0.25
+	weightPingJitter     = 0.25
+	weightPingLoss       = 0.25
 	weightResolveAvg     = 0.25
 	weightResolveMedian  = 0.25
 	weightResolveJitter  = 0.25
@@ -285,57 +284,111 @@ func resolveDomain(ctx context.Context, domain, server string) ([]float64, int, 
 	return resolveTimes, successes, nil
 }
 
-func testProvider(ctx context.Context, provider Provider, resultChan chan<- TestResult, wg *sync.WaitGroup) {
+func testProvider(ctx context.Context, provider Provider, runs int, resultChan chan<- TestResult, wg *sync.WaitGroup) {
 	defer wg.Done()
 	result := resultPool.Get().(*TestResult)
 	result.Name = provider.Name
 	result.IP = provider.IP
 
-	// Ping test.
-	avgPing, minPing, maxPing, medianPing, pingJitter, pingLoss, pingTimes, err := getPingStats(ctx, provider.IP)
-	if err != nil {
-		// Optionally log error.
+	// Run ping tests multiple times and collect results.
+	var pingAvgSum, pingMinSum, pingMaxSum, pingMedianSum, pingJitterSum, pingLossSum float64
+	var allPingTimes [][]float64
+	pingRuns := 0
+	for i := 0; i < runs; i++ {
+		avgPing, minPing, maxPing, medianPing, pingJitter, pingLoss, pingTimes, err := getPingStats(ctx, provider.IP)
+		if err == nil {
+			pingAvgSum += parseMs(avgPing)
+			pingMinSum += parseMs(minPing)
+			pingMaxSum += parseMs(maxPing)
+			pingMedianSum += parseMs(medianPing)
+			pingJitterSum += parseMs(pingJitter)
+			pingLossSum += pingLoss
+			allPingTimes = append(allPingTimes, pingTimes)
+			pingRuns++
+		}
+		time.Sleep(100 * time.Millisecond) // Small delay between runs
 	}
-	result.AvgPing = avgPing
-	result.MinPing = minPing
-	result.MaxPing = maxPing
-	result.PingMedian = medianPing
-	result.PingJitter = pingJitter
-	result.PingLoss = fmt.Sprintf("%.1f%%", pingLoss)
-	result.PingAvgVal = parseMs(avgPing)
-	result.PingMedianVal, _, _, _, _ = statsDetailed(pingTimes)
-	result.PingJitterVal = parseMs(pingJitter)
-	result.PingLossVal = pingLoss
-
-	// DNS resolve tests (for multiple domains).
-	var resolveWG sync.WaitGroup
-	allResolveTimes := make([][]float64, len(domains))
-	totalDNSAttempts := len(domains) * resolveCount
-	totalDNSSuccess := 0
-	for i, domain := range domains {
-		resolveWG.Add(1)
-		go func(idx int, d string) {
-			defer resolveWG.Done()
-			times, successes, err := resolveDomain(ctx, d, provider.IP)
-			if err == nil {
-				allResolveTimes[idx] = times
-				totalDNSSuccess += successes
-			}
-		}(i, domain)
-	}
-	resolveWG.Wait()
-	var combinedResolve []float64
-	for _, times := range allResolveTimes {
-		combinedResolve = append(combinedResolve, times...)
-	}
-	var dnsLoss float64
-	if totalDNSAttempts > 0 {
-		dnsLoss = ((float64(totalDNSAttempts) - float64(totalDNSSuccess)) / float64(totalDNSAttempts)) * 100.0
+	if pingRuns > 0 {
+		result.AvgPing = fmt.Sprintf("%.1f ms", pingAvgSum/float64(pingRuns))
+		result.MinPing = fmt.Sprintf("%.1f ms", pingMinSum/float64(pingRuns))
+		result.MaxPing = fmt.Sprintf("%.1f ms", pingMaxSum/float64(pingRuns))
+		result.PingMedian = fmt.Sprintf("%.1f ms", pingMedianSum/float64(pingRuns))
+		result.PingJitter = fmt.Sprintf("%.1f ms", pingJitterSum/float64(pingRuns))
+		result.PingLoss = fmt.Sprintf("%.1f%%", pingLossSum/float64(pingRuns))
+		result.PingAvgVal = pingAvgSum / float64(pingRuns)
+		var combinedPingTimes []float64
+		for _, times := range allPingTimes {
+			combinedPingTimes = append(combinedPingTimes, times...)
+		}
+		_, _, _, result.PingMedianVal, result.PingJitterVal = statsDetailed(combinedPingTimes)
+		result.PingLossVal = pingLossSum / float64(pingRuns)
 	} else {
-		dnsLoss = 9999
+		result.AvgPing = failMessage
+		result.MinPing = failMessage
+		result.MaxPing = failMessage
+		result.PingMedian = failMessage
+		result.PingJitter = failMessage
+		result.PingLoss = "100%"
+		result.PingAvgVal = 9999
+		result.PingMedianVal = 9999
+		result.PingJitterVal = 9999
+		result.PingLossVal = 9999
 	}
 
-	if len(combinedResolve) == 0 {
+	// Run DNS resolve tests multiple times across all domains.
+	var resolveAvgSum, resolveMinSum, resolveMaxSum, resolveMedianSum, resolveJitterSum, resolveLossSum float64
+	var allResolveTimes []float64
+	var totalDNSAttempts, totalDNSSuccess int
+	resolveRuns := 0
+	for run := 0; run < runs; run++ {
+		var resolveWG sync.WaitGroup
+		runResolveTimes := make([][]float64, len(domains))
+		runDNSAttempts := len(domains) * resolveCount
+		runDNSSuccess := 0
+
+		for i, domain := range domains {
+			resolveWG.Add(1)
+			go func(idx int, d string) {
+				defer resolveWG.Done()
+				times, successes, err := resolveDomain(ctx, d, provider.IP)
+				if err == nil {
+					runResolveTimes[idx] = times
+					runDNSSuccess += successes
+				}
+			}(i, domain)
+		}
+		resolveWG.Wait()
+
+		var combinedRunResolve []float64
+		for _, times := range runResolveTimes {
+			combinedRunResolve = append(combinedRunResolve, times...)
+		}
+		if len(combinedRunResolve) > 0 {
+			avgResVal, minResVal, maxResVal, medianResVal, jitterResVal := statsDetailed(combinedRunResolve)
+			resolveAvgSum += avgResVal
+			resolveMinSum += minResVal
+			resolveMaxSum += maxResVal
+			resolveMedianSum += medianResVal
+			resolveJitterSum += jitterResVal
+			resolveLossSum += ((float64(runDNSAttempts) - float64(runDNSSuccess)) / float64(runDNSAttempts)) * 100.0
+			allResolveTimes = append(allResolveTimes, combinedRunResolve...)
+			totalDNSAttempts += runDNSAttempts
+			totalDNSSuccess += runDNSSuccess
+			resolveRuns++
+		}
+		time.Sleep(100 * time.Millisecond) // Small delay between runs
+	}
+	if resolveRuns > 0 {
+		result.AvgResolveTime = fmt.Sprintf("%.1f ms", resolveAvgSum/float64(resolveRuns))
+		result.MinResolveTime = fmt.Sprintf("%.1f ms", resolveMinSum/float64(resolveRuns))
+		result.MaxResolveTime = fmt.Sprintf("%.1f ms", resolveMaxSum/float64(resolveRuns))
+		result.ResolveMedian = fmt.Sprintf("%.1f ms", resolveMedianSum/float64(resolveRuns))
+		result.ResolveJitter = fmt.Sprintf("%.1f ms", resolveJitterSum/float64(resolveRuns))
+		result.ResolveLoss = fmt.Sprintf("%.1f%%", resolveLossSum/float64(resolveRuns))
+		result.ResolveAvgVal = resolveAvgSum / float64(resolveRuns)
+		_, _, _, result.ResolveMedianVal, result.ResolveJitterVal = statsDetailed(allResolveTimes)
+		result.ResolveLossVal = resolveLossSum / float64(resolveRuns)
+	} else {
 		result.AvgResolveTime = failMessage
 		result.MinResolveTime = failMessage
 		result.MaxResolveTime = failMessage
@@ -345,19 +398,7 @@ func testProvider(ctx context.Context, provider Provider, resultChan chan<- Test
 		result.ResolveAvgVal = 9999
 		result.ResolveMedianVal = 9999
 		result.ResolveJitterVal = 9999
-		result.ResolveLossVal = dnsLoss
-	} else {
-		avgResVal, minResVal, maxResVal, medianResVal, jitterResVal := statsDetailed(combinedResolve)
-		result.AvgResolveTime = fmt.Sprintf("%.1f ms", avgResVal)
-		result.MinResolveTime = fmt.Sprintf("%.1f ms", minResVal)
-		result.MaxResolveTime = fmt.Sprintf("%.1f ms", maxResVal)
-		result.ResolveMedian = fmt.Sprintf("%.1f ms", medianResVal)
-		result.ResolveJitter = fmt.Sprintf("%.1f ms", jitterResVal)
-		result.ResolveLoss = fmt.Sprintf("%.1f%%", dnsLoss)
-		result.ResolveAvgVal = avgResVal
-		result.ResolveMedianVal = medianResVal
-		result.ResolveJitterVal = jitterResVal
-		result.ResolveLossVal = dnsLoss
+		result.ResolveLossVal = 9999
 	}
 
 	resultChan <- *result
@@ -388,11 +429,37 @@ func testProvider(ctx context.Context, provider Provider, resultChan chan<- Test
 	resultPool.Put(result)
 }
 
-func printTable(results []TestResult) {
-	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"Provider", "IP", "Avg Ping", "Median Ping", "Ping Jitter", "Ping Loss", "Avg Resolve", "Median Resolve", "Resolve Jitter", "Resolve Loss"})
+// Updated function to save JSON output to file
+func saveJSON(results []TestResult) {
+	jsonData, err := json.MarshalIndent(results, "", "  ")
+	if err != nil {
+		fmt.Printf("Error marshaling JSON: %v\n", err)
+		return
+	}
+	err = os.WriteFile("dns-tester-results.json", jsonData, 0644)
+	if err != nil {
+		fmt.Printf("Error writing JSON to file: %v\n", err)
+		return
+	}
+	fmt.Println("Results saved to dns-tester-results.json")
+}
+
+// Updated function to save CSV output to file
+func saveCSV(results []TestResult) {
+	file, err := os.Create("dns-tester-results.csv")
+	if err != nil {
+		fmt.Printf("Error creating CSV file: %v\n", err)
+		return
+	}
+	defer file.Close()
+
+	writer := csv.NewWriter(file)
+	writer.Write([]string{
+		"Provider", "IP", "Avg Ping", "Median Ping", "Ping Jitter", "Ping Loss",
+		"Avg Resolve", "Median Resolve", "Resolve Jitter", "Resolve Loss",
+	})
 	for _, res := range results {
-		table.Append([]string{
+		writer.Write([]string{
 			res.Name,
 			res.IP,
 			res.AvgPing,
@@ -405,12 +472,15 @@ func printTable(results []TestResult) {
 			res.ResolveLoss,
 		})
 	}
-	fmt.Println("\nDNS Provider Benchmark Results:")
-	table.Render()
+	writer.Flush()
+	if err := writer.Error(); err != nil {
+		fmt.Printf("Error writing CSV: %v\n", err)
+		return
+	}
+	fmt.Println("Results saved to dns-tester-results.csv")
 }
 
-// printRecommendations computes a weighted composite score using normalized values
-// for ping and DNS metrics. Lower composite scores indicate better overall performance.
+// Updated printRecommendations to show top 10
 func printRecommendations(results []TestResult) {
 	// Find best (lowest) values across providers for each metric.
 	epsilon := 0.0001
@@ -418,7 +488,6 @@ func printRecommendations(results []TestResult) {
 	bestPingMedian := 99999.0
 	bestPingJitter := 99999.0
 	bestPingLoss := 99999.0
-
 	bestResolveAvg := 99999.0
 	bestResolveMedian := 99999.0
 	bestResolveJitter := 99999.0
@@ -463,12 +532,10 @@ func printRecommendations(results []TestResult) {
 			(r.PingMedianVal/(bestPingMedian+epsilon))*weightPingMedian +
 			(r.PingJitterVal/(bestPingJitter+epsilon))*weightPingJitter +
 			(r.PingLossVal/(bestPingLoss+epsilon))*weightPingLoss
-
 		resolveScore := (r.ResolveAvgVal/(bestResolveAvg+epsilon))*weightResolveAvg +
 			(r.ResolveMedianVal/(bestResolveMedian+epsilon))*weightResolveMedian +
 			(r.ResolveJitterVal/(bestResolveJitter+epsilon))*weightResolveJitter +
 			(r.ResolveLossVal/(bestResolveLoss+epsilon))*weightResolveLoss
-
 		cs := pingScore + resolveScore
 		ranked = append(ranked, RankedResult{r, cs})
 	}
@@ -478,7 +545,8 @@ func printRecommendations(results []TestResult) {
 		return ranked[i].CompositeScore < ranked[j].CompositeScore
 	})
 
-	topCount := 8
+	// Show top 10 (or fewer if less than 10 results).
+	topCount := 10
 	if len(ranked) < topCount {
 		topCount = len(ranked)
 	}
@@ -502,18 +570,28 @@ func printRecommendations(results []TestResult) {
 			rr.ResolveLoss,
 		})
 	}
-	fmt.Println("\nRecommended Top 8 DNS Providers (by composite score):")
+	fmt.Println("\nTop 10 DNS Providers (by composite score):")
 	table.Render()
 }
 
+// Updated IPv6 detection function
 func isIPv6Enabled() bool {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "ping6", "-c", "1", "-W", "1", "google.com")
-	return cmd.Run() == nil
+	cmd := exec.CommandContext(ctx, "dig", "-6", "@2606:4700:4700::1111", "google.com", "+time=1", "+tries=1")
+	err := cmd.Run()
+	return err == nil
 }
 
 func main() {
+	var outputFormat string
+	var testRuns int
+	flag.StringVar(&outputFormat, "output", "table", "Output format: table, json, csv")
+	flag.StringVar(&outputFormat, "o", "table", "Shorthand for --output")
+	flag.IntVar(&testRuns, "runs", 3, "Number of test runs for averaging")
+	flag.IntVar(&testRuns, "r", 3, "Shorthand for --runs")
+	flag.Parse()
+
 	ctx := context.Background()
 	var providers []Provider
 	providers = append(providers, providersV4...)
@@ -524,18 +602,21 @@ func main() {
 	resultChan := make(chan TestResult, numProviders)
 	var results []TestResult
 
-	bar := progressbar.NewOptions(numProviders,
+	// Adjust progress bar for total tasks (providers * runs)
+	bar := progressbar.NewOptions(numProviders*testRuns,
 		progressbar.OptionEnableColorCodes(true),
 		progressbar.OptionShowCount(),
 		progressbar.OptionSetWidth(50),
-		progressbar.OptionSetDescription("Testing DNS providers"),
+		progressbar.OptionSetDescription(fmt.Sprintf("Testing DNS providers (%d runs each)", testRuns)),
 		progressbar.OptionSetTheme(progressbar.Theme{
 			Saucer:        "[green]=[reset]",
 			SaucerHead:    "[green]>[reset]",
 			SaucerPadding: " ",
 			BarStart:      "[",
 			BarEnd:        "]",
-		}))
+		}),
+		progressbar.OptionSetWriter(os.Stderr), // Redirect progress bar to stderr
+	)
 
 	var wg sync.WaitGroup
 	semaphore := make(chan struct{}, maxWorkers)
@@ -544,8 +625,10 @@ func main() {
 		semaphore <- struct{}{}
 		go func(p Provider) {
 			defer func() { <-semaphore }()
-			testProvider(ctx, p, resultChan, &wg)
-			bar.Add(1)
+			testProvider(ctx, p, testRuns, resultChan, &wg)
+			for i := 0; i < testRuns; i++ {
+				bar.Add(1) // Increment for each run
+			}
 		}(provider)
 	}
 	go func() {
@@ -555,10 +638,16 @@ func main() {
 	for res := range resultChan {
 		results = append(results, res)
 	}
-	// Optionally sort results by provider name before printing.
-	sort.Slice(results, func(i, j int) bool {
-		return results[i].Name < results[j].Name
-	})
-	printTable(results)
+
+	// Handle output based on format
+	switch outputFormat {
+	case "json":
+		saveJSON(results)
+	case "csv":
+		saveCSV(results)
+	default:
+		// No action for "table" since we only print recommendations
+	}
+	// Always print top 10 recommendations
 	printRecommendations(results)
 }
