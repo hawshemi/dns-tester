@@ -185,6 +185,7 @@ func getPingStats(ctx context.Context, ip string) (avg, min, max, median, jitter
 		}
 		time.Sleep(time.Duration(100*(1<<retry)) * time.Millisecond)
 	}
+
 	if err != nil {
 		return failMessage, failMessage, failMessage, failMessage, failMessage, 9999, nil, err
 	}
@@ -601,6 +602,10 @@ func main() {
 	numProviders := len(providers)
 	resultChan := make(chan TestResult, numProviders)
 	var results []TestResult
+
+	// Print minimal ASCII banner
+	fmt.Println("DNS-Tester")
+	fmt.Println("----------")
 
 	// Adjust progress bar for total tasks (providers * runs)
 	bar := progressbar.NewOptions(numProviders*testRuns,
