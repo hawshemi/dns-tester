@@ -64,10 +64,7 @@ Examples:
 
 ### Prerequisites
 
-#### Install `wget`:
-```
-sudo apt install -y wget
-```
+#### Install `golang`.
 
 #### 1. Clone the repository
 ```
