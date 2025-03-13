@@ -62,9 +62,7 @@ Examples:
 
 ## Build
 
-### Prerequisites
-
-#### Install `golang`.
+#### 0. Install `golang`.
 
 #### 1. Clone the repository
 ```
