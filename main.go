@@ -54,10 +54,10 @@ type TestResult struct {
 
 const (
 	failMessage    = "FAIL"
-	pingCount      = 6  // increased sample size for ping
-	resolveCount   = 6  // increased sample size for DNS resolve
+	pingCount      = 6
+	resolveCount   = 6
 	timeoutSeconds = 2
-	maxWorkers     = 10
+	maxWorkers     = 20
 	maxRetries     = 3
 	warmupRounds   = 1
 )
@@ -571,8 +571,10 @@ func printRecommendations(results []TestResult) {
 			rr.ResolveLoss,
 		})
 	}
-	fmt.Println("\nTop 10 DNS Providers (by composite score):")
+	fmt.Println("Top 10 DNS Providers (ranked by composite score):")
+  fmt.Println()
 	table.Render()
+  fmt.Println()
 }
 
 // Updated IPv6 detection function
@@ -603,9 +605,25 @@ func main() {
 	resultChan := make(chan TestResult, numProviders)
 	var results []TestResult
 
-	// Print minimal ASCII banner
-	fmt.Println("DNS-Tester")
-	fmt.Println("----------")
+  banner := `
+  +------------------------------------------------------------------------------------+
+  |                                                                                    |
+  |  ██████╗ ███╗   ██╗███████╗    ████████╗███████╗███████╗████████╗███████╗██████╗   |
+  |  ██╔══██╗████╗  ██║██╔════╝    ╚══██╔══╝██╔════╝██╔════╝╚══██╔══╝██╔════╝██╔══██╗  |
+  |  ██║  ██║██╔██╗ ██║███████╗       ██║   █████╗  ███████╗   ██║   █████╗  ██████╔╝  |
+  |  ██║  ██║██║╚██╗██║╚════██║       ██║   ██╔══╝  ╚════██║   ██║   ██╔══╝  ██╔══██╗  |
+  |  ██████╔╝██║ ╚████║███████║       ██║   ███████╗███████║   ██║   ███████╗██║  ██║  |
+  |  ╚═════╝ ╚═╝  ╚═══╝╚══════╝       ╚═╝   ╚══════╝╚══════╝   ╚═╝   ╚══════╝╚═╝  ╚═╝  |
+  |                                                                                    |
+  +------------------------------------------------------------------------------------+
+  
+  By: github.com/hawshemi
+  
+  `
+  
+  fmt.Println(banner)
+
+
 
 	// Adjust progress bar for total tasks (providers * runs)
 	bar := progressbar.NewOptions(numProviders*testRuns,
