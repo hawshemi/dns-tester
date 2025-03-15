@@ -55,6 +55,9 @@ Examples:
 ## Build
 
 #### 0. Install `golang`.
+```bash
+wget "https://raw.githubusercontent.com/hawshemi/tools/main/go-installer/go-installer.sh" -O go-installer.sh && chmod +x go-installer.sh && bash go-installer.sh
+```
 
 #### 1. Clone the repository
 ```bash
