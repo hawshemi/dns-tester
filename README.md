@@ -65,7 +65,7 @@ git clone https://github.com/hawshemi/dns-tester.git
 cd dns-tester
 ```
 
-#### 3.
+#### 3. Prepare for build
 ```
 go mod init dns-tester && go mod tidy
 ```
