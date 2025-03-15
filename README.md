@@ -20,8 +20,9 @@ DNS Tester is a command-line tool written in Go that benchmarks various DNS prov
 ## Run
 
 ### Linux / MacOS:
-
-    curl -L "https://raw.githubusercontent.com/hawshemi/dns-tester/main/dns-tester-run.sh" -o dns-tester-run.sh && chmod +x dns-tester-run.sh && bash dns-tester-run.sh
+```bash
+curl -L "https://raw.githubusercontent.com/hawshemi/dns-tester/main/dns-tester-run.sh" -o dns-tester-run.sh && chmod +x dns-tester-run.sh && bash dns-tester-run.sh
+```
 
 ### Windows: (Broken [for now](https://github.com/hawshemi/dns-tester/issues/4))
 
@@ -35,7 +36,7 @@ DNS Tester is a command-line tool written in Go that benchmarks various DNS prov
     
 ## Usage
 
-dns-tester flags:
+**Flags:**
 
 `--output (-o): Output format (table, json, csv), default: table`
 
@@ -45,7 +46,7 @@ dns-tester flags:
 
 Examples:
 
-```
+```bash
 ./dns-tester
 ./dns-tester -o json -r 5
 ./dns-tester --output=csv --runs=2
@@ -56,20 +57,20 @@ Examples:
 #### 0. Install `golang`.
 
 #### 1. Clone the repository
-```
+```bash
 git clone https://github.com/hawshemi/dns-tester.git 
 ```
 
 #### 2. Navigate into the repository directory
-```
+```bash
 cd dns-tester
 ```
 
 #### 3. Prepare for build
-```
+```bash
 go mod init dns-tester && go mod tidy
 ```
 #### 4. Build
-```
+```bash
 CGO_ENABLED=0 go build
 ```
