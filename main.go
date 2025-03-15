@@ -57,7 +57,7 @@ const (
 	pingCount      = 6
 	resolveCount   = 6
 	timeoutSeconds = 2
-	maxWorkers     = 20
+	maxWorkers     = 10
 	maxRetries     = 3
 	warmupRounds   = 1
 )
