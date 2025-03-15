@@ -23,7 +23,7 @@ DNS Tester is a command-line tool written in Go that benchmarks various DNS prov
 
     curl -L "https://raw.githubusercontent.com/hawshemi/dns-tester/main/dns-tester-run.sh" -o dns-tester-run.sh && chmod +x dns-tester-run.sh && bash dns-tester-run.sh
 
-### Windows:
+### Windows: (Broken [for now](https://github.com/hawshemi/dns-tester/issues/4))
 
 1. Download from [Releases](https://github.com/hawshemi/dns-tester/releases/latest).
 2. Open `CMD` or `Powershell` in the directory.
