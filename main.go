@@ -26,30 +26,30 @@ type Provider struct {
 }
 
 type TestResult struct {
-	Name              string
-	IP                string
+	Name string
+	IP   string
 	// Formatted strings for display.
-	AvgPing           string
-	MinPing           string
-	MaxPing           string
-	PingMedian        string
-	PingJitter        string
-	PingLoss          string
-	AvgResolveTime    string
-	MinResolveTime    string
-	MaxResolveTime    string
-	ResolveMedian     string
-	ResolveJitter     string
-	ResolveLoss       string
+	AvgPing        string
+	MinPing        string
+	MaxPing        string
+	PingMedian     string
+	PingJitter     string
+	PingLoss       string
+	AvgResolveTime string
+	MinResolveTime string
+	MaxResolveTime string
+	ResolveMedian  string
+	ResolveJitter  string
+	ResolveLoss    string
 	// Numeric values used for composite scoring.
-	PingAvgVal        float64
-	PingMedianVal     float64
-	PingJitterVal     float64
-	PingLossVal       float64
-	ResolveAvgVal     float64
-	ResolveMedianVal  float64
-	ResolveJitterVal  float64
-	ResolveLossVal    float64
+	PingAvgVal       float64
+	PingMedianVal    float64
+	PingJitterVal    float64
+	PingLossVal      float64
+	ResolveAvgVal    float64
+	ResolveMedianVal float64
+	ResolveJitterVal float64
+	ResolveLossVal   float64
 }
 
 const (
@@ -57,27 +57,27 @@ const (
 	pingCount      = 6
 	resolveCount   = 6
 	timeoutSeconds = 2
-	maxWorkers     = 10
+	maxWorkers     = 8
 	maxRetries     = 3
 	warmupRounds   = 1
 )
 
 // Weights for composite score (you can adjust these).
 const (
-	weightPingAvg        = 0.25
-	weightPingMedian     = 0.25
-	weightPingJitter     = 0.25
-	weightPingLoss       = 0.25
-	weightResolveAvg     = 0.25
-	weightResolveMedian  = 0.25
-	weightResolveJitter  = 0.25
-	weightResolveLoss    = 0.25
+	weightPingAvg       = 0.25
+	weightPingMedian    = 0.25
+	weightPingJitter    = 0.25
+	weightPingLoss      = 0.25
+	weightResolveAvg    = 0.25
+	weightResolveMedian = 0.25
+	weightResolveJitter = 0.25
+	weightResolveLoss   = 0.25
 )
 
 var (
 	providersV4 = []Provider{
 		{"1.1.1.1", "Cloudflare (v4)"},
-		{"1.1.1.2", "Cloudflare-Security (v4)"},
+		{"1.1.1.2", "Cloudflare-Sec (v4)"},
 		{"8.8.8.8", "Google (v4)"},
 		{"9.9.9.9", "Quad9 (v4)"},
 		{"209.244.0.3", "Level3 (v4)"},
@@ -85,28 +85,28 @@ var (
 		{"193.110.81.0", "Dns0.eu (v4)"},
 		{"76.76.2.2", "ControlD (v4)"},
 		{"95.85.95.85", "GcoreDNS (v4)"},
-		{"185.228.168.9", "CleanBrowsing-Security (v4)"},
+		{"185.228.168.9", "CleanBrowsing-Sec (v4)"},
 		{"208.67.222.222", "OpenDNS (v4)"},
 		{"77.88.8.8", "Yandex (v4)"},
 		{"77.88.8.88", "Yandex-Safe (v4)"},
 		{"64.6.64.6", "UltraDNS (v4)"},
-		{"156.154.70.2", "UltraDNS-ThreatProtection (v4)"},
+		{"156.154.70.2", "UltraDNS-Sec (v4)"},
 	}
 
 	providersV6 = []Provider{
 		{"2606:4700:4700::1111", "Cloudflare (v6)"},
-		{"2606:4700:4700::1112", "Cloudflare-Security (v6)"},
+		{"2606:4700:4700::1112", "Cloudflare-Sec (v6)"},
 		{"2001:4860:4860::8888", "Google (v6)"},
 		{"2620:fe::fe", "Quad9 (v6)"},
 		{"2a10:50c0::ad1:ff", "Adguard (v6)"},
 		{"2a0f:fc80::", "Dns0.eu (v6)"},
 		{"2606:1a40::2", "ControlD (v6)"},
 		{"2a03:90c0:999d::1", "GcoreDNS (v6)"},
-		{"2a0d:2a00:1::2", "CleanBrowsing-Security (v6)"},
+		{"2a0d:2a00:1::2", "CleanBrowsing-Sec (v6)"},
 		{"2a02:6b8::feed:0ff", "Yandex (v6)"},
 		{"2a02:6b8::feed:bad", "Yandex-Safe (v6)"},
 		{"2620:74:1b::1:1", "UltraDNS (v6)"},
-		{"2610:a1:1018::2", "UltraDNS-ThreatProtection (v6)"},
+		{"2610:a1:1018::2", "UltraDNS-Sec (v6)"},
 	}
 
 	domains = []string{
@@ -481,7 +481,7 @@ func saveCSV(results []TestResult) {
 	fmt.Println("Results saved to dns-tester-results.csv")
 }
 
-// Updated printRecommendations to show top 10
+// Updated printRecommendations to show top 12
 func printRecommendations(results []TestResult) {
 	// Find best (lowest) values across providers for each metric.
 	epsilon := 0.0001
@@ -546,8 +546,8 @@ func printRecommendations(results []TestResult) {
 		return ranked[i].CompositeScore < ranked[j].CompositeScore
 	})
 
-	// Show top 10 (or fewer if less than 10 results).
-	topCount := 10
+	// Show top 12 (or fewer if less than 12 results).
+	topCount := 12
 	if len(ranked) < topCount {
 		topCount = len(ranked)
 	}
@@ -555,8 +555,8 @@ func printRecommendations(results []TestResult) {
 
 	table := tablewriter.NewWriter(os.Stdout)
 	table.SetHeader([]string{"Rank", "Provider", "IP", "Composite Score", "Avg Ping", "Median Ping", "Ping Jitter", "Ping Loss", "Avg Resolve", "Median Resolve", "Resolve Jitter", "Resolve Loss"})
-  table.SetAlignment(tablewriter.ALIGN_CENTER)
-  
+	table.SetAlignment(tablewriter.ALIGN_CENTER)
+
 	for i, rr := range topResults {
 		table.Append([]string{
 			strconv.Itoa(i + 1),
@@ -573,10 +573,10 @@ func printRecommendations(results []TestResult) {
 			rr.ResolveLoss,
 		})
 	}
-	fmt.Println("\nTop 10 DNS Providers (ranked by composite score):")
-  fmt.Println()
+	fmt.Println("\nTop 12 DNS Providers (ranked by composite score):")
+	fmt.Println()
 	table.Render()
-  fmt.Println()
+	fmt.Println()
 }
 
 // Updated IPv6 detection function
@@ -607,7 +607,7 @@ func main() {
 	resultChan := make(chan TestResult, numProviders)
 	var results []TestResult
 
-  banner := `
+	banner := `
   +------------------------------------------------------------------------------------+
   |                                                                                    |
   |  ██████╗ ███╗   ██╗███████╗    ████████╗███████╗███████╗████████╗███████╗██████╗   |
@@ -622,10 +622,8 @@ func main() {
   By: github.com/hawshemi
   
   `
-  
-  fmt.Println(banner)
 
-
+	fmt.Println(banner)
 
 	// Adjust progress bar for total tasks (providers * runs)
 	bar := progressbar.NewOptions(numProviders*testRuns,
@@ -673,6 +671,6 @@ func main() {
 	default:
 		// No action for "table" since we only print recommendations
 	}
-	// Always print top 10 recommendations
+	// Always print top 12 recommendations
 	printRecommendations(results)
 }
