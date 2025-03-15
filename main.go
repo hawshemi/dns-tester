@@ -555,6 +555,8 @@ func printRecommendations(results []TestResult) {
 
 	table := tablewriter.NewWriter(os.Stdout)
 	table.SetHeader([]string{"Rank", "Provider", "IP", "Composite Score", "Avg Ping", "Median Ping", "Ping Jitter", "Ping Loss", "Avg Resolve", "Median Resolve", "Resolve Jitter", "Resolve Loss"})
+  table.SetAlignment(tablewriter.ALIGN_CENTER)
+  
 	for i, rr := range topResults {
 		table.Append([]string{
 			strconv.Itoa(i + 1),
@@ -571,7 +573,7 @@ func printRecommendations(results []TestResult) {
 			rr.ResolveLoss,
 		})
 	}
-	fmt.Println("Top 10 DNS Providers (ranked by composite score):")
+	fmt.Println("\nTop 10 DNS Providers (ranked by composite score):")
   fmt.Println()
 	table.Render()
   fmt.Println()
@@ -629,7 +631,7 @@ func main() {
 	bar := progressbar.NewOptions(numProviders*testRuns,
 		progressbar.OptionEnableColorCodes(true),
 		progressbar.OptionShowCount(),
-		progressbar.OptionSetWidth(50),
+		progressbar.OptionSetWidth(100),
 		progressbar.OptionSetDescription(fmt.Sprintf("Testing DNS providers (%d runs each)", testRuns)),
 		progressbar.OptionSetTheme(progressbar.Theme{
 			Saucer:        "[green]=[reset]",
