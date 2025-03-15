@@ -631,7 +631,7 @@ func main() {
 	bar := progressbar.NewOptions(numProviders*testRuns,
 		progressbar.OptionEnableColorCodes(true),
 		progressbar.OptionShowCount(),
-		progressbar.OptionSetWidth(100),
+		progressbar.OptionSetWidth(50),
 		progressbar.OptionSetDescription(fmt.Sprintf("Testing DNS providers (%d runs each)", testRuns)),
 		progressbar.OptionSetTheme(progressbar.Theme{
 			Saucer:        "[green]=[reset]",
